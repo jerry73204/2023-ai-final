@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "jigsaw-diffusion"
+version = "0.1.0"
+description = "The diffusion model solving Jigsaw puzzles based on OpenAI's guided-diffusion"
+authors = ["aeon <jerry73204@gmail.com>"]
+readme = "README.md"
+packages = [{include = "jigsaw_diffusion"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+torch = "^2.0.0"
+torchvision = "^0.15.1"
+
+[tool.poetry.group.test]  # This part can be left out
+
+[tool.poetry.group.test.dependencies]
+pytest = "^6.0.0"
+pytest-mock = "*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
