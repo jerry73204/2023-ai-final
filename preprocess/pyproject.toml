@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "preprocess"
+version = "0.1.0"
+description = ""
+authors = ["aeon <jerry73204@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+opencv-python = "^4.7.0.72"
+numpy = "^1.24.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.3.1"
+
+[tool.poetry.scripts]
+main = "preprocess.main:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
