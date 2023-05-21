@@ -5,7 +5,7 @@ Train a diffusion model on images.
 import argparse
 
 from jigsaw_diffusion import dist_util, logger
-from jigsaw_diffusion.image_datasets import load_data
+from jigsaw_diffusion.jigsaw_datasets import load_data
 from jigsaw_diffusion.resample import create_named_schedule_sampler
 from jigsaw_diffusion.script_util import (
     model_and_diffusion_defaults,
@@ -33,10 +33,10 @@ def main():
     data = load_data(
         data_dir=args.data_dir,
         batch_size=args.batch_size,
-        image_size=args.image_size,
-        class_cond=args.class_cond,
+        piece_size=args.piece_size,
     )
-
+    print("here")
+    exit()
     logger.log("training...")
     TrainLoop(
         model=model,
@@ -71,10 +71,11 @@ def parse_args():
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
+        piece_size=64
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_dir", required=True)
+    parser.add_argument("--data_dir", default="../dataset/example/")
     add_dict_to_argparser(parser, defaults)
     return parser.parse_args()
 
