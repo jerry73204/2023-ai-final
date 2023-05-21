@@ -13,11 +13,11 @@ from jigsaw_diffusion.script_util import (
     args_to_dict,
     add_dict_to_argparser,
 )
-from jigsaw_diffusion.train_util import TrainLoop
+from jigsaw_diffusion.jigsaw_train_util import TrainLoop
 
 
 def main():
-    args = create_argparser().parse_args()
+    args = parse_args()
 
     dist_util.setup_dist()
     logger.configure()
@@ -57,9 +57,8 @@ def main():
     ).run_loop()
 
 
-def create_argparser():
+def parse_args():
     defaults = dict(
-        data_dir="",
         schedule_sampler="uniform",
         lr=1e-4,
         weight_decay=0.0,
@@ -75,12 +74,10 @@ def create_argparser():
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
+    parser.add_argument("--data_dir", required=True)
     add_dict_to_argparser(parser, defaults)
-    return parser
+    return parser.parse_args()
 
-
-# if __name__ == "__main__":
-#     main()
 
 def __main__():
     main()
