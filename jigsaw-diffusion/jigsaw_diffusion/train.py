@@ -5,7 +5,7 @@ Train a diffusion model on images.
 import argparse
 
 from jigsaw_diffusion import dist_util, logger
-from jigsaw_diffusion.jigsaw_datasets import load_data
+from jigsaw_diffusion.jigsaw_datasets import JigsawDataset
 from jigsaw_diffusion.resample import create_named_schedule_sampler
 from jigsaw_diffusion.script_util import (
     model_and_diffusion_defaults,
@@ -30,18 +30,21 @@ def main():
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
     logger.log("creating data loader...")
-    data = load_data(
+    # images, labels
+    jigsaw_dataset = JigsawDataset(
         data_dir=args.data_dir,
         batch_size=args.batch_size,
         piece_size=args.piece_size,
     )
-    print("here")
-    exit()
+    logger.log("load dataset finish")
+    #  TODO
+    jigsaw_dataloader = jigsaw_dataset
+    # exit()
     logger.log("training...")
     TrainLoop(
         model=model,
         diffusion=diffusion,
-        data=data,
+        data=jigsaw_dataloader,
         batch_size=args.batch_size,
         microbatch=args.microbatch,
         lr=args.lr,
