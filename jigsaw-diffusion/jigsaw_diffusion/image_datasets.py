@@ -13,6 +13,7 @@ def load_data(
     data_dir,
     batch_size,
     image_size,
+    class_cond=False,
     deterministic=False,
     random_crop=False,
     random_flip=True,
