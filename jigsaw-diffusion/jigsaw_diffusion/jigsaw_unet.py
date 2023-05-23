@@ -50,26 +50,25 @@ class JigsawUNetModel(nn.Module):
 
     def __init__(
         self,
-        image_size,
-        num_pieces,
-        piece_channels,
-        model_channels,
-        position_channels,
-        num_res_blocks,
+        image_size: int,
+        num_pieces: int,
+        piece_channels: int,
+        model_channels: int,
+        position_channels: int,
+        num_res_blocks: int,
         attention_resolutions,
-        dropout=0,
+        dropout: float = 0,
         channel_mult=(1, 2, 4, 8),
-        conv_resample=True,
-        dims=2,
-        num_classes=None,
-        use_checkpoint=False,
-        use_fp16=False,
-        num_heads=1,
-        num_head_channels=-1,
-        num_heads_upsample=-1,
-        use_scale_shift_norm=False,
-        resblock_updown=False,
-        use_new_attention_order=False,
+        conv_resample: bool = True,
+        dims: int = 2,
+        use_checkpoint: bool = False,
+        use_fp16: bool = False,
+        num_heads: int = 1,
+        num_head_channels: int = -1,
+        num_heads_upsample: int = -1,
+        use_scale_shift_norm: bool = False,
+        resblock_updown: bool = False,
+        use_new_attention_order: bool = False,
     ):
         super().__init__()
 
@@ -86,7 +85,6 @@ class JigsawUNetModel(nn.Module):
         self.dropout = dropout
         self.channel_mult = channel_mult
         self.conv_resample = conv_resample
-        self.num_classes = num_classes
         self.use_checkpoint = use_checkpoint
         self.dtype = th.float16 if use_fp16 else th.float32
         self.num_heads = num_heads
@@ -104,10 +102,6 @@ class JigsawUNetModel(nn.Module):
             nn.SiLU(),
             linear(time_embed_dim, time_embed_dim),
         )
-
-        # Create label embedding module
-        if self.num_classes is not None:
-            self.label_emb = nn.Embedding(num_classes, time_embed_dim)
 
         ch = input_ch = int(channel_mult[0] * model_channels)
         self.input_blocks = nn.ModuleList(

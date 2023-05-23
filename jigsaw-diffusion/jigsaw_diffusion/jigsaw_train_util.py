@@ -13,6 +13,7 @@ from .fp16_util import MixedPrecisionTrainer
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 
+
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
 # 20-21 within the first ~1K steps of training.
@@ -22,11 +23,10 @@ INITIAL_LOG_LOSS_SCALE = 20.0
 class TrainLoop:
     def __init__(
         self,
-        *,
         model,
         diffusion,
         data,
-        batch_size,
+        batch_size: int,
         microbatch,
         lr,
         ema_rate,
@@ -155,7 +155,6 @@ class TrainLoop:
             not self.lr_anneal_steps
             or self.step + self.resume_step < self.lr_anneal_steps
         ):  
-            print(self.data)
             batch, cond = next(self.data)
             self.run_step(batch, cond)
             if self.step % self.log_interval == 0:
