@@ -101,10 +101,11 @@ def main():
             h = y2 - y1
             cx = x1 + w / 2
             cy = y1 + h / 2
-            center = [cx, cy]
+            rotation = 0.0
+            center = [cx, cy, rotation]
             return center
 
-        centers = (bbox_center(bbox) for pid, bbox in pieces)
+        centers = (bbox_center(bbox) for _, bbox in pieces)
         label_path = output_dir / "label.csv"
         with open(label_path, "w") as fp:
             writer = csv.writer(fp)
@@ -155,6 +156,13 @@ def process_piece_image(orig_image, image_size: int):
     return image
 
 
+def rotate_image(image, angle):
+    image_center = tuple(np.array(image.shape[1::-1]) / 2)
+    rot_mat = cv.getRotationMatrix2D(image_center, angle, 1.0)
+    result = cv.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv.INTER_LINEAR)
+    return result
+
+
 def reassemble_puzzle(pieces, output_dir: Path, output_size: int):
     # Load piece images
     def load_image(pid):
@@ -166,14 +174,15 @@ def reassemble_puzzle(pieces, output_dir: Path, output_size: int):
     # Load center coordinates
     label_path = output_dir / "label.csv"
     with open(label_path, "r") as fp:
-        centers = list((float(x), float(y)) for x, y in csv.reader(fp))
+        centers = list(list(float(val) for val in params) for params in csv.reader(fp))
 
     canvas = np.full([output_size, output_size, 3], 0, dtype=np.uint8)
 
     for image, center in zip(images, centers):
+        cx, cy, angle = center
+        image = rotate_image(image, angle)
         mask = image != 0
 
-        cx, cy = center
         h, w, _ = image.shape
 
         y1 = int(math.floor(cy - h / 2))
