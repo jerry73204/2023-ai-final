@@ -5,23 +5,26 @@ numpy array. This can be used to produce samples for FID evaluation.
 
 import argparse
 import os
+from pathlib import Path
 
 import numpy as np
 import torch as th
 import torch.distributed as dist
 
+from jigsaw_diffusion.jigsaw_datasets import load_data
+
 from . import dist_util, logger
+
+# model_and_diffusion_defaults,
+# create_model_and_diffusion,
+from .jigsaw_script_util import (
+    create_model_and_diffusion,
+    model_and_diffusion_defaults,
+)
 from .script_util import (
     # NUM_CLASSES,
     add_dict_to_argparser,
     args_to_dict,
-    # model_and_diffusion_defaults,
-    # create_model_and_diffusion,
-)
-
-from .jigsaw_script_util import (
-    model_and_diffusion_defaults,
-    create_model_and_diffusion,
 )
 
 
@@ -31,6 +34,15 @@ def main():
     dist_util.setup_dist()
     logger.configure()
 
+    # Load data
+    data_loader = load_data(
+        data_dir=Path(args.data_dir),
+        piece_size=args.piece_size,
+        batch_size=args.batch_size,
+        deterministic=True,
+    )
+
+    # Load model
     logger.log("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(
         **args_to_dict(args, model_and_diffusion_defaults().keys())
@@ -46,14 +58,17 @@ def main():
     logger.log("sampling...")
     all_images = []
     all_labels = []
-    while len(all_images) * args.batch_size < args.num_samples:
-        model_kwargs = {}
+
+    for position, cond in data_loader:
+        pieces = cond["pieces"].to(dist_util.dev())
+
+        model_kwargs = {"pieces": pieces}
         sample_fn = (
             diffusion.p_sample_loop if not args.use_ddim else diffusion.ddim_sample_loop
         )
         sample = sample_fn(
             model,
-            (args.batch_size, 3, args.image_size, args.image_size),
+            position.shape,
             clip_denoised=args.clip_denoised,
             model_kwargs=model_kwargs,
         )
@@ -84,6 +99,7 @@ def create_argparser():
         num_samples=10000,
         batch_size=16,
         use_ddim=False,
+        piece_size=64,
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
