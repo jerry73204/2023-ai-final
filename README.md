@@ -11,6 +11,14 @@ Intellegence course in Depart. of CSIE, National Taiwan University in
 - [*JigsawPlan: Room Layout Jigsaw Puzzle Extreme Structure from Motion using Diffusion Models*](https://arxiv.org/abs/2211.13785), Hosseini et al., 2022
 
 
+## Prerequisites
+
+- _poetry_, a dependency management tool for Python. Please follow this
+  [doc](https://python-poetry.org/docs/) to install poetry.
+- _GNU parallel_, a parallel command executor used in our
+  scripts. Ubuntu users can install this command by `apt install
+  parallel`.
+
 ## Get Started
 
 Change directory to `scripts/` as we'll run the scripts within.
