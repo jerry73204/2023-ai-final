@@ -18,6 +18,10 @@ Intellegence course in Depart. of CSIE, National Taiwan University in
 - _GNU parallel_, a parallel command executor used in our
   scripts. Ubuntu users can install this command by `apt install
   parallel`.
+- `optipng`. Ubuntu users can install by `apt install optipng`.
+- `rsvg-convert`. Ubuntu users can install by `apt install librsvg2-bin`.
+- `potrace`. Ubuntu users can install by `apt install potrace`.
+
 
 ## Get Started
 
