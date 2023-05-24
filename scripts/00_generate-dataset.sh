@@ -9,6 +9,7 @@ cd "$script_dir/.."
 mkdir dataset/puzzles
 
 cd "$script_dir/../puzzle-generator"
+poetry install
 
 for (( pid=0; pid<$n_puzzles; pid++ )); do
     echo "poetry run main -- ../dataset/puzzles/$(printf 'p%04d' $pid)"
