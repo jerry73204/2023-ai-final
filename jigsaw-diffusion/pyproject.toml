@@ -24,7 +24,8 @@ pytest = "^6.0.0"
 pytest-mock = "*"
 
 [tool.poetry.scripts]
-train = "jigsaw_diffusion.train:__main__"
+train = "jigsaw_diffusion.train:main"
+sample = "jigsaw_diffusion.sample:main"
 
 [build-system]
 requires = ["poetry-core"]
