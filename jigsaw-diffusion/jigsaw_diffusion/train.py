@@ -34,6 +34,7 @@ def main():
         data_dir=Path(args.data_dir),
         batch_size=args.batch_size,
         piece_size=args.piece_size,
+        deterministic=False,
     )
     logger.log("load dataset finish")
 
