@@ -92,7 +92,7 @@ class JigsawUNetModel(nn.Module):
         self.num_heads_upsample = num_heads_upsample
 
         # Compute input/output channels
-        in_channels = num_pieces * piece_channels
+        in_channels = num_pieces * (piece_channels + position_channels)
         out_channels = num_pieces * position_channels
 
         # Create time embedding module
@@ -259,14 +259,18 @@ class JigsawUNetModel(nn.Module):
         self.middle_block.apply(convert_module_to_f32)
         self.output_blocks.apply(convert_module_to_f32)
 
-    def forward(self, positions, pieces, timesteps):
+    def forward(self, positions, timesteps, pieces):
         """
         Apply the model to an input batch.
+        `B` is the batch size. `N` is the number of pieces.
+        `C` is the channel size for piece images.
+        `P` is the number of parameters to describe the pose of a piece.
+        `H` and `W` are the height and the width of piece images.
 
-        :param positions: an [N x P x 3] Tensor of inputs.
-        :param pieces: an [N × P × C × H × W] Tensor of inputs.
+        :param positions: an [B x N x P] Tensor of inputs.
+        :param pieces: an [B × N × C × H × W] Tensor of inputs.
         :param timesteps: a 1-D batch of timesteps.
-        :return: an [N x P x 3] Tensor of outputs.
+        :return: an [B x N x 3] Tensor of outputs.
         """
 
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
@@ -277,16 +281,20 @@ class JigsawUNetModel(nn.Module):
         assert sc == self.piece_channels
         assert sp == self.position_channels
 
-        # Reshape `pieces` shape to [N x (PxC) x H x W]
-        pieces = pieces.view(sb, sn * sc, sh, sw)
+        # Rehape `positions` to [B x N x P x 1 x 1]
+        positions = positions.view(sb, sn, sp, 1, 1)
 
-        # Broadcast `positions` shape to [N x (P x 3) x H x W]
-        positions = positions.view(sb, sn * sp, 1, 1).expand(sb, sn * sp, sh, sw)
+        # Broadcast `positions` shape to [B x N x P x H x W]
+        positions = positions.expand(sb, sn, sp, sh, sw)
 
-        # concat pieces and positions on channel dimension
-        x_in = th.cat([pieces, positions], 2)
+        # Concatenate pieces and positions into a compound tensor with shape
+        # [B x N x (C + P) x H x W]
+        compound = th.cat([pieces, positions], 2)
 
-        # downsampling blocks
+        # Reshape the compound tensor to image-like shape [B x (Nx(C+P)) x H x W]
+        x_in = compound.reshape(sb, sn * (sc + sp), sh, sw)
+
+        # Downsampling blocks
         hs = []
         x_h = x_in.type(self.dtype)
         for module in self.input_blocks:
