@@ -72,9 +72,17 @@ def main():
             clip_denoised=args.clip_denoised,
             model_kwargs=model_kwargs,
         )
-        sample = ((sample + 1) * 127.5).clamp(0, 255).to(th.uint8)
-        sample = sample.permute(0, 2, 3, 1)
-        sample = sample.contiguous()
+
+        # TODO(Mark): Plot an image for the generated puzzle solution.
+        #
+        # `sample` is a [BxNx3] tensor of piece positions generated
+        # from the diffusion model. B is the batch size, N=25 is the
+        # number of pieces per puzzle, and the last dimension are x,
+        # y, angle(radians) parameters.
+        #
+        # The piece images are store in `pieces` tensor with shape
+        # [BxNx1x64x64]. For example, to get the piece image of the
+        # 3rd piece of the 2nd batch, try `image = pieces[2, 3]`.
 
         gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
         dist.all_gather(gathered_samples, sample)  # gather not supported with NCCL
