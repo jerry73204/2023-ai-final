@@ -1,21 +1,19 @@
 """
-Train a diffusion model on images.
+Train a diffusion model on puzzles.
 """
 
 import argparse
-from . import dist_util, logger
+from pathlib import Path
+
+from . import dist_util, jigsaw_datasets, logger
+from .jigsaw_train_util import TrainLoop
+from .jigsaw_unet import JigsawUNetModel
 from .resample import create_named_schedule_sampler
 from .script_util import (
-    args_to_dict,
     add_dict_to_argparser,
+    args_to_dict,
     create_gaussian_diffusion,
 )
-from .jigsaw_train_util import TrainLoop
-from . import jigsaw_datasets
-from .jigsaw_unet import JigsawUNetModel
-
-# from .respace import SpacedDiffusion, space_timesteps
-# from . import gaussian_diffusion as gd
 
 
 def main():
@@ -33,7 +31,7 @@ def main():
 
     logger.log("creating data loader...")
     jigsaw_dataloader = jigsaw_datasets.load_data(
-        data_dir=args.data_dir,
+        data_dir=Path(args.data_dir),
         batch_size=args.batch_size,
         piece_size=args.piece_size,
     )
