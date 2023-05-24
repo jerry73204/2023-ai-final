@@ -34,8 +34,16 @@ located at `REPO/dataset/puzzles`.
 ./00_generate-dataset.sh
 ```
 
-To start model training,
+Next, train the model. The model file will be saved to
+`log/modeXXXXXXX.pt`.
 
 ```sh
 ./01_train.sh
+```
+
+Run the script to load most recently saved checkpoint file to generate
+puzzle solutions.
+
+```sh
+./02_sample.sh
 ```
