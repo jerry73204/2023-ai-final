@@ -1,15 +1,18 @@
-from pathlib import Path
-from argparse import ArgumentParser
-import json
-import json5
 import csv
-from typing import List
-import cv2 as cv
-import tempfile
-from subprocess import Popen
-import numpy as np
+import json
 import math
 import random
+import shutil
+import sys
+import tempfile
+from argparse import ArgumentParser
+from pathlib import Path
+from subprocess import Popen
+from typing import List
+
+import cv2 as cv
+import json5
+import numpy as np
 
 
 def parse_args():
@@ -17,6 +20,25 @@ def parse_args():
     parser.add_argument("OUTPUT_DIR")
     parser.add_argument("-s", "--piece_image_size", type=int, default=64)
     return parser.parse_args()
+
+
+def check_piecemaker_output(input_dir: Path, image_size: int) -> bool:
+    size_100_dir = input_dir / "size-100"
+    pieces_path = size_100_dir / "pieces.json"
+
+    with open(pieces_path, "r") as fp:
+        piece_names = list(json.load(fp).keys())
+
+    raster_dir = size_100_dir / "raster"
+
+    for pid in piece_names:
+        image_path = raster_dir / "{}.png".format(int(pid))
+        image = cv.imread(str(image_path), cv.IMREAD_UNCHANGED)
+        h, w, _ = image.shape
+        if h >= image_size or w >= image_size:
+            return False
+
+    return True
 
 
 def main():
@@ -32,12 +54,34 @@ def main():
         background_size = image_size * 3
         white_image = np.full([background_size, background_size, 3], 255)
         white_image_path = input_dir / "white.png"
-        cv.imwrite(str(white_image_path), white_image)
 
-        proc = Popen(
-            ["piecemaker", "--dir", str(input_dir), "-n", "25", str(white_image_path)]
-        )
-        proc.wait(10)
+        is_successful = False
+        for _ in range(10):
+            cv.imwrite(str(white_image_path), white_image)
+            proc = Popen(
+                [
+                    "piecemaker",
+                    "--dir",
+                    str(input_dir),
+                    "-n",
+                    "25",
+                    str(white_image_path),
+                ]
+            )
+            proc.wait(10)
+
+            if check_piecemaker_output(input_dir, image_size):
+                is_successful = True
+                break
+            else:
+                print("Some pieces are too large. Retrying...", file=sys.stderr)
+                shutil.rmtree(input_dir)
+                input_dir.mkdir()
+
+        if not is_successful:
+            print("Unable to run `piecemaker`. Is it installed?", file=sys.stderr)
+            return 1
+
         size_100_dir = input_dir / "size-100"
 
         # Load data generated from piecemaker
@@ -75,7 +119,7 @@ def main():
 
         # Write images
         raster_dir = size_100_dir / "raster"
-        for pid, bbox in pieces:
+        for pid, _ in pieces:
             in_image_path = raster_dir / "{}.png".format(int(pid))
             orig_image = cv.imread(str(in_image_path), cv.IMREAD_UNCHANGED)
             new_image = process_piece_image(orig_image, image_size)
