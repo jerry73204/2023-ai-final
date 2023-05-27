@@ -50,14 +50,17 @@ class Manifest:
 
 class JigsawDataset(Dataset):
     def __init__(self, data_dir: Path, piece_size: int):
-        self.piece_images, self.positions = self.load_data_dir(data_dir, piece_size)
+        self.piece_images, self.positions, self.adjacent_maps = self.load_data_dir(
+            data_dir, piece_size
+        )
         self.n_samples = len(self.positions)
 
     def __getitem__(self, index):
         position = self.positions[index]
         piece_image = self.piece_images[index]
+        adjacent_map = self.adjacent_maps[index]
         cond = {"pieces": piece_image}
-        return position, cond
+        return position, cond, adjacent_map
 
     def __len__(self):
         return self.n_samples
@@ -71,8 +74,8 @@ class JigsawDataset(Dataset):
             self.load_puzzle_dir(data_dir, puzzle_info, piece_size)
             for puzzle_info in manifest.puzzles
         )
-        piece_images, positions = zip(*samples)
-        return piece_images, positions
+        piece_images, positions, adjacent_maps = zip(*samples)
+        return piece_images, positions, adjacent_maps
 
     def load_puzzle_dir(self, data_dir: Path, puzzle_info: PuzzleInfo, piece_size: int):
         puzzle_name = puzzle_info.name
@@ -100,4 +103,9 @@ class JigsawDataset(Dataset):
             assert len(label_list) == n_pieces
             label_tensor = torch.FloatTensor(label_list)
 
-        return piece_tensor, label_tensor
+        # Load adjecnt.json5
+        adjacent_path = puzzle_dir / "adjacent.json5"
+        with open(adjacent_path, "r") as fp:
+            adjacent_map = json5.load(fp)
+
+        return piece_tensor, label_tensor, adjacent_map

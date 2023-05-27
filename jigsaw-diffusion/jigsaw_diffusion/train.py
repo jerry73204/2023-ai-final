@@ -7,14 +7,12 @@ from pathlib import Path
 
 from . import dist_util, jigsaw_datasets, logger
 from .jigsaw_train_util import TrainLoop
-from .jigsaw_unet import JigsawUNetModel
 from .resample import create_named_schedule_sampler
 from .script_util import (
     add_dict_to_argparser,
     args_to_dict,
 )
 from .jigsaw_script_util import model_and_diffusion_defaults, create_model_and_diffusion
-
 
 def main():
     args = parse_args()
