@@ -68,7 +68,7 @@ def main():
                     str(white_image_path),
                 ]
             )
-            proc.wait(10)
+            proc.wait(50)
 
             if check_piecemaker_output(input_dir, image_size):
                 is_successful = True
