@@ -14,4 +14,4 @@ echo "Using model file ${model_path}"
 
 export OPENAI_LOGDIR="${script_dir}/../log"
 poetry install
-poetry run sample -- --data_dir ../dataset/puzzles --model_path="${model_path}"
+poetry run sample -- --data_dir ../dataset/puzzles --model_path="${model_path}" $@

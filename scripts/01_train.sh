@@ -7,4 +7,4 @@ cd "${script_dir}/../jigsaw-diffusion"
 
 export OPENAI_LOGDIR="${script_dir}/../log"
 poetry install
-poetry run train -- --data_dir ../dataset/puzzles --use_checkpoint=True
+poetry run train -- --data_dir ../dataset/puzzles $@
