@@ -119,3 +119,48 @@ git add log/
 git commit -m 'Save weights files.'
 git push
 ```
+
+## Fine-Tuning
+
+In the file `jigsaw-diffusion/jigsaw_diffusion/jigsaw_script_util.py`,
+tweak the model parameters here.
+
+```python
+def diffusion_defaults():
+    """
+    Defaults for image and classifier training.
+    """
+    return dict(
+        learn_sigma=False,
+        diffusion_steps=500,
+        noise_schedule="linear",
+        timestep_respacing="",
+        use_kl=False,
+        predict_xstart=False,
+        rescale_timesteps=False,
+        rescale_learned_sigmas=False,
+    )
+```
+
+In the file `jigsaw-diffusion/jigsaw_diffusion/train.py`,
+tweak the training parameters here.
+
+```python
+def parse_args():
+    defaults = dict(
+        schedule_sampler="uniform",
+        lr=1e-4,
+        weight_decay=0.0,
+        lr_anneal_steps=0,
+        batch_size=1,
+        microbatch=-1,  # -1 disables microbatches
+        ema_rate="0.9999",  # comma-separated list of EMA values
+        log_interval=10,
+        save_interval=10000,
+        resume_checkpoint="",
+        use_fp16=False,
+        fp16_scale_growth=1e-3,
+        piece_size=64,
+        puzzle_size=320,
+    )
+```
