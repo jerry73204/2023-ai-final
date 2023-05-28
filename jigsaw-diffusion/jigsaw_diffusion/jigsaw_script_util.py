@@ -2,6 +2,10 @@ from .jigsaw_unet import JigsawUNetModel
 from .script_util import (
     create_gaussian_diffusion,
 )
+import numpy as np
+import cv2 as cv
+import math
+import random
 
 
 def create_model_and_diffusion(
@@ -199,3 +203,40 @@ def diffusion_defaults():
         rescale_timesteps=False,
         rescale_learned_sigmas=False,
     )
+
+
+def rotate_image(image, angle):
+    image_center = tuple(np.array(image.shape[1::-1]) / 2)
+    rot_mat = cv.getRotationMatrix2D(image_center, angle, 1.0)
+    result = cv.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv.INTER_LINEAR)
+    return result
+
+
+def reassemble_puzzle(all_positions_i, all_pieces_i, output_size=320):
+    # print(all_positions_i.shape,all_pieces_i.shape)
+    # Create a new canvas for each image
+    canvas = np.full([1, output_size, output_size], 0, dtype=np.uint8)
+
+    for image, center in zip(all_pieces_i, all_positions_i):
+        cx, cy, angle = center
+        image = rotate_image(image, angle)
+        mask = image != 0
+
+        _, h, w = image.shape
+
+        y1 = int(math.floor(cy - h / 2))
+        y2 = y1 + h
+        y3 = max(y1, 0)
+        y4 = min(y2, output_size)
+
+        x1 = int(math.floor(cx - w / 2))
+        x2 = x1 + w
+        x3 = max(x1, 0)
+        x4 = min(x2, output_size)
+
+        sub_canvas = canvas[:, y3:y4, x3:x4]
+        sub_mask = mask[:, (y3 - y1) : (y4 - y1), (x3 - x1) : (x4 - x1)]
+        sub_canvas[sub_mask] = random.randint(128, 255)
+
+    canvas = np.transpose(canvas, [1, 2, 0])
+    return canvas
