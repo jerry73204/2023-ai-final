@@ -58,18 +58,35 @@ located at `REPO/dataset/puzzles`.
 
 ### Training
 
-Next, train the model. The weights file will be saved to
-`log/modeXXXXXXX.pt`.
-
+Run the command below to train the model. The weights file will be
+saved to `log/modeXXXXXXX.pt`. The weights files can be saved to
+`log/` directory using `git-lfs`. Please read the later [Manage Large
+Weights Files](#manage-large-weights-files) for more details.
 
 ```sh
 ./01_train.sh
 ```
 
-The weights files can be saved via `git-lfs`. Please read the later
-[Manage Large Weights Files](#manage-large-weights-files) for more
-details.
+Pass command line arguments to tweak the batch size. The default batch
+size is 1.
 
+```sh
+./01_train.sh --batch_size=16
+```
+
+Pass `--show_gui` to show the input puzzles fed into the model during
+training.
+
+```sh
+./01_train.sh --show_gui
+```
+
+Pass `--resume_checkpoint` to resume the model weights from a weights
+file.
+
+```sh
+./01_train.sh --resume_checkpoint=$PWD/../log/model050000.pt
+```
 
 ### Testing
 
