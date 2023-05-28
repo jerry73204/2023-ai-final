@@ -6,6 +6,7 @@ import numpy as np
 import cv2 as cv
 import math
 import random
+import numpy.typing as npt
 
 
 def create_model_and_diffusion(
@@ -122,47 +123,6 @@ def create_model(
     )
 
 
-# def create_gaussian_diffusion(
-#     *,
-#     steps=1000,
-#     learn_sigma=False,
-#     sigma_small=False,
-#     noise_schedule="linear",
-#     use_kl=False,
-#     predict_xstart=False,
-#     rescale_timesteps=False,
-#     rescale_learned_sigmas=False,
-#     timestep_respacing="",
-# ):
-#     betas = gd.get_named_beta_schedule(noise_schedule, steps)
-#     if use_kl:
-#         loss_type = gd.LossType.RESCALED_KL
-#     elif rescale_learned_sigmas:
-#         loss_type = gd.LossType.RESCALED_MSE
-#     else:
-#         loss_type = gd.LossType.MSE
-#     if not timestep_respacing:
-#         timestep_respacing = [steps]
-#     return SpacedDiffusion(
-#         use_timesteps=space_timesteps(steps, timestep_respacing),
-#         betas=betas,
-#         model_mean_type=(
-#             gd.ModelMeanType.EPSILON if not predict_xstart else gd.ModelMeanType.START_X
-#         ),
-#         model_var_type=(
-#             (
-#                 gd.ModelVarType.FIXED_LARGE
-#                 if not sigma_small
-#                 else gd.ModelVarType.FIXED_SMALL
-#             )
-#             if not learn_sigma
-#             else gd.ModelVarType.LEARNED_RANGE
-#         ),
-#         loss_type=loss_type,
-#         rescale_timesteps=rescale_timesteps,
-#     )
-
-
 def model_and_diffusion_defaults():
     """
     Defaults for image training.
@@ -195,7 +155,7 @@ def diffusion_defaults():
     """
     return dict(
         learn_sigma=False,
-        diffusion_steps=100,
+        diffusion_steps=500,
         noise_schedule="linear",
         timestep_respacing="",
         use_kl=False,
@@ -205,38 +165,59 @@ def diffusion_defaults():
     )
 
 
-def rotate_image(image, angle):
-    image_center = tuple(np.array(image.shape[1::-1]) / 2)
-    rot_mat = cv.getRotationMatrix2D(image_center, angle, 1.0)
-    result = cv.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv.INTER_LINEAR)
+def rotate_image(image: npt.NDArray[np.uint8], angle_deg: float):
+    sh, sw, sc = image.shape
+    center = (sh / 2, sw / 2)
+    rot_mat = cv.getRotationMatrix2D(center, angle_deg, 1.0)
+    result = cv.warpAffine(image, rot_mat, (sh, sw), flags=cv.INTER_LINEAR)
+
+    if sc == 1:
+        assert result.shape == (sh, sw)
+        result = result.reshape(sh, sw, 1)
+
+    # cv.imshow("before", image)
+    # cv.imshow("after", result)
+    # cv.waitKey(1)
     return result
 
 
-def reassemble_puzzle(all_positions_i, all_pieces_i, output_size=320):
-    # print(all_positions_i.shape,all_pieces_i.shape)
-    # Create a new canvas for each image
-    canvas = np.full([1, output_size, output_size], 0, dtype=np.uint8)
+def reassemble_puzzle(
+    positions: npt.NDArray[np.float32],
+    pieces: npt.NDArray[np.uint8],
+    puzzle_size: int,
+):
+    """
+    Reassemble the piece images according to their poses into an image.
+    The channel-last convension is used.
+    """
 
-    for image, center in zip(all_pieces_i, all_positions_i):
-        cx, cy, angle = center
-        image = rotate_image(image, angle)
+    # Create a new canvas for each image
+    _, _, _, nc = pieces.shape
+    canvas = np.full([puzzle_size, puzzle_size, nc], 0, dtype=np.uint8)
+
+    for image, center in zip(pieces, positions):
+        cx, cy, angle_rad = center
+        cx = float(cx)
+        cy = float(cy)
+        angle_deg = float(angle_rad) * 180 / math.pi
+
+        image = rotate_image(image, angle_deg)
         mask = image != 0
 
-        _, h, w = image.shape
+        h, w, _ = image.shape
 
         y1 = int(math.floor(cy - h / 2))
         y2 = y1 + h
-        y3 = max(y1, 0)
-        y4 = min(y2, output_size)
+        y3 = min(max(y1, 0), puzzle_size)
+        y4 = min(max(y2, 0), puzzle_size)
 
         x1 = int(math.floor(cx - w / 2))
         x2 = x1 + w
-        x3 = max(x1, 0)
-        x4 = min(x2, output_size)
+        x3 = min(max(x1, 0), puzzle_size)
+        x4 = min(max(x2, 0), puzzle_size)
 
-        sub_canvas = canvas[:, y3:y4, x3:x4]
-        sub_mask = mask[:, (y3 - y1) : (y4 - y1), (x3 - x1) : (x4 - x1)]
+        sub_canvas = canvas[y3:y4, x3:x4]
+        sub_mask = mask[(y3 - y1) : (y4 - y1), (x3 - x1) : (x4 - x1)]
         sub_canvas[sub_mask] = random.randint(128, 255)
 
-    canvas = np.transpose(canvas, [1, 2, 0])
     return canvas

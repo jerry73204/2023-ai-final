@@ -11,6 +11,7 @@ import csv
 
 import torch as th
 import torch.distributed as dist
+import numpy as np
 
 from .jigsaw_datasets import load_data
 from .jigsaw_script_util import reassemble_puzzle
@@ -97,18 +98,30 @@ def main():
         all_pieces = list(chain(*(piece.cpu().numpy() for piece in gathered_pieces)))
         logger.log(f"created {len(all_pieces) * args.batch_size} pieces")
 
-        for all_positions_i, all_pieces_i in zip(all_positions, all_pieces):
-            image = reassemble_puzzle(all_positions_i, all_pieces_i)
+        for positions, pieces in zip(all_positions, all_pieces):
+            pieces = ((pieces + 0.5) * 255.0).astype(np.uint8)
+            pieces = np.transpose(pieces, [0, 2, 3, 1])
+
+            image = reassemble_puzzle(
+                positions=positions,
+                pieces=pieces,
+                puzzle_size=args.puzzle_size,
+            )
             image_path = os.path.join(path_parent, f"image_{i}.png")
             cv.imwrite(image_path, image)
+
+            if args.show_gui:
+                cv.imshow("result", image)
 
             position_path = os.path.join(path_parent, f"position_{i}.csv")
             with open(position_path, "w") as fp:
                 writer = csv.writer(fp)
-                for row in all_positions_i:
+                for row in positions:
                     writer.writerow(row)
 
             i += 1
+
+        cv.waitKey(1)
 
     logger.log("sampling complete")
 
@@ -125,6 +138,7 @@ def create_argparser():
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", default="../dataset/example/")
+    parser.add_argument("--show_gui", action="store_true")
     parser.add_argument("--model_path")
     add_dict_to_argparser(parser, defaults)
     return parser

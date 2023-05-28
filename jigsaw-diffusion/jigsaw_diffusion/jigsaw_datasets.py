@@ -12,8 +12,8 @@ import json5
 import torch
 from serde import from_dict, serde
 from torch.utils.data import DataLoader, Dataset
-import torchvision
-from torchvision.transforms import RandomAffine
+import torchvision.transforms.functional as VF
+import torch.nn.functional as F
 
 
 def load_data(
@@ -128,7 +128,10 @@ class JigsawDataset(Dataset):
             piece_path = puzzle_dir / "{:02}.png".format(piece_idx)
             piece_image = cv.imread(str(piece_path), cv.IMREAD_GRAYSCALE)
             assert piece_image.shape == (piece_size, piece_size)
-            return torch.from_numpy(piece_image).reshape(1, piece_size, piece_size)
+            return (
+                torch.from_numpy(piece_image).reshape(1, piece_size, piece_size) / 255.0
+                - 0.5
+            )
 
         piece_images = list(load_image(piece_idx) for piece_idx in range(n_pieces))
         piece_tensor = torch.stack(piece_images, 0)
@@ -159,9 +162,11 @@ class JigsawDataset(Dataset):
         piece_image: torch.FloatTensor,
         adjacent_map: List[List[int]],
     ):
+        pi_2 = math.pi * 2
         n_pieces = piece_image.shape[0]
 
         # 2/3 chance to sample a subset of pieces
+        # if random.random() < 2 / 3:
         if random.random() < 2 / 3:
             pivot_idx = random.randrange(n_pieces)
             selected_set = set([pivot_idx])
@@ -186,22 +191,50 @@ class JigsawDataset(Dataset):
             )
 
             rot = position[non_selected_set, 2:3]
-            rot = torch.rand(rot.shape) * math.pi * 2.0
+            rot = torch.rand(rot.shape) * pi_2
 
-            piece_image[non_selected_set] = 0.0
+            piece_image[non_selected_set] = -0.5
 
         # Random per-piece rotation
-        piece_angle = np.random.rand(n_pieces) * math.pi * 2.0
-        position[:, 2] -= piece_angle
+        puzzle_angle_rad = random.random() * pi_2
+        piece_angle_rad = np.random.rand(n_pieces) * pi_2
+        total_angle_rad = (puzzle_angle_rad + piece_angle_rad) % pi_2
+
+        puzzle_angle_deg = puzzle_angle_rad * 180 / math.pi
+        total_angle_deg = total_angle_rad * 180.0 / math.pi
+
+        position[:, 2] = (position[:, 2] + pi_2 - piece_angle_rad) % pi_2
 
         for idx in range(n_pieces):
-            piece_image[idx] = torchvision.transforms.functional.rotate(
-                piece_image[idx], piece_angle[idx] * 180 / math.pi
+            piece_image[idx] = VF.rotate(
+                piece_image[idx], total_angle_deg[idx], fill=-0.5
             )
 
-        # Random global affine transform
-        # puzzle_angle = random.random() * math.pi * 2.0
-        translation = torch.rand(1, 2) * self.puzzle_size - self.piece_size * 2
+        # Random global translation
+        x = position[:, 0]
+        min_x = min(x)
+        max_x = max(x)
+        mid_x = (min_x + max_x) / 2
+        shift_x = self.puzzle_size / 2 - mid_x
+
+        y = position[:, 1]
+        min_y = min(y)
+        max_y = max(y)
+        mid_y = (min_y + max_y) / 2
+        shift_y = self.puzzle_size / 2 - mid_y
+
+        translation = (
+            torch.FloatTensor([[shift_x, shift_y]])
+            + (torch.rand(1, 2) - 0.5) * self.piece_size
+        )
         position[:, :2] += translation
+
+        # Random global rotation
+        center = (self.puzzle_size / 2, self.puzzle_size / 2)
+        rot_mat = torch.from_numpy(
+            cv.getRotationMatrix2D(center, puzzle_angle_deg, 1.0).astype(np.float32)
+        )
+        xy1 = F.pad(position[:, :2], pad=(0, 1, 0, 0), mode="constant", value=1.0)
+        position[:, :2] = torch.matmul(xy1, rot_mat.transpose(0, 1))
 
         return position, piece_image

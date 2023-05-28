@@ -14,6 +14,7 @@ from .script_util import (
 )
 from .jigsaw_script_util import model_and_diffusion_defaults, create_model_and_diffusion
 
+
 def main():
     args = parse_args()
 
@@ -42,6 +43,7 @@ def main():
         model=model,
         diffusion=diffusion,
         data=jigsaw_dataloader,
+        puzzle_size=args.puzzle_size,
         batch_size=args.batch_size,
         microbatch=args.microbatch,
         lr=args.lr,
@@ -54,6 +56,7 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
+        show_gui=args.show_gui,
     ).run_loop()
 
 
@@ -77,5 +80,6 @@ def parse_args():
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_dir", default="../dataset/example/")
+    parser.add_argument("--show_gui", action="store_true")
     add_dict_to_argparser(parser, defaults)
     return parser.parse_args()

@@ -7,11 +7,14 @@ import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
+import cv2 as cv
+import numpy as np
 
 from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
+from .jigsaw_script_util import reassemble_puzzle
 
 
 # For ImageNet experiments, this was a good default value.
@@ -26,6 +29,7 @@ class TrainLoop:
         model,
         diffusion,
         data,
+        puzzle_size: int,
         batch_size: int,
         microbatch,
         lr,
@@ -38,10 +42,12 @@ class TrainLoop:
         schedule_sampler=None,
         weight_decay=0.0,
         lr_anneal_steps=0,
+        show_gui=False,
     ):
         self.model = model
         self.diffusion = diffusion
         self.data = data
+        self.puzzle_size = puzzle_size
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size
         self.lr = lr
@@ -64,6 +70,7 @@ class TrainLoop:
         self.global_batch = self.batch_size * dist.get_world_size()
 
         self.sync_cuda = th.cuda.is_available()
+        self.show_gui = show_gui
 
         self._load_and_sync_parameters()
         self.mp_trainer = MixedPrecisionTrainer(
@@ -156,8 +163,32 @@ class TrainLoop:
             or self.step + self.resume_step < self.lr_anneal_steps
         ):
             batch, cond = next(self.data)
+            pieces = cond["pieces"]
+
+            if self.show_gui and self.step % self.log_interval == 0:
+                with th.no_grad():
+
+                    def reassemble(positions, piece_image):
+                        pieces = ((piece_image.numpy() + 0.5) * 255.0).astype(np.uint8)
+                        pieces = np.transpose(pieces, [0, 2, 3, 1])
+
+                        return reassemble_puzzle(
+                            positions=positions.numpy(),
+                            pieces=pieces,
+                            puzzle_size=self.puzzle_size,
+                        )
+
+                    puzzle_images = list(
+                        reassemble(positions, piece_image)
+                        for piece_image, positions in zip(pieces, batch)
+                    )
+
+                    for idx, image in enumerate(puzzle_images):
+                        cv.imshow(f"input_{idx}", image)
+                        cv.waitKey(1)
 
             self.run_step(batch, cond)
+
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
             if self.step % self.save_interval == 0:
