@@ -32,6 +32,7 @@ def main():
         data_dir=Path(args.data_dir),
         batch_size=args.batch_size,
         piece_size=args.piece_size,
+        puzzle_size=args.puzzle_size,
         deterministic=False,
     )
     logger.log("load dataset finish")
@@ -71,6 +72,7 @@ def parse_args():
         use_fp16=False,
         fp16_scale_growth=1e-3,
         piece_size=64,
+        puzzle_size=320,
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
