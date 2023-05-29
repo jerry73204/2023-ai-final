@@ -167,7 +167,6 @@ class TrainLoop:
 
             if self.show_gui and self.step % self.log_interval == 0:
                 with th.no_grad():
-
                     def reassemble(positions, piece_image):
                         pieces = ((piece_image.numpy() + 0.5) * 255.0).astype(np.uint8)
                         pieces = np.transpose(pieces, [0, 2, 3, 1])
