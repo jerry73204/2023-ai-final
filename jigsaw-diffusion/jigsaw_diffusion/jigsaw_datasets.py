@@ -14,14 +14,14 @@ from serde import from_dict, serde
 from torch.utils.data import DataLoader, Dataset
 import torchvision.transforms.functional as VF
 import torch.nn.functional as F
-
-
+from .jigsaw_script_util import *
 def load_data(
     data_dir: Path,
     batch_size: int,
     piece_size: int,
     puzzle_size: int,
     deterministic=False,
+    
 ):
     if not data_dir:
         raise ValueError("unspecified data directory")
@@ -32,7 +32,6 @@ def load_data(
         puzzle_size=puzzle_size,
         augment=not deterministic,
     )
-
     if deterministic:
         loader = DataLoader(
             dataset,
@@ -78,14 +77,16 @@ class JigsawDataset(Dataset):
 
     def __init__(
         self, data_dir: Path, piece_size: int, puzzle_size: int, augment: bool
-    ):
+    ):  
+        self.augment = augment
+        self.piece_size = piece_size
+        self.puzzle_size = puzzle_size
         self.piece_images, self.positions, self.adjacent_maps = self.load_data_dir(
             data_dir, piece_size
         )
         self.n_samples = len(self.positions)
-        self.augment = augment
-        self.piece_size = piece_size
-        self.puzzle_size = puzzle_size
+        
+        print('init')
 
     def __getitem__(self, index):
         with torch.no_grad():
@@ -119,7 +120,7 @@ class JigsawDataset(Dataset):
     def load_puzzle_dir(self, data_dir: Path, puzzle_info: PuzzleInfo, piece_size: int):
         puzzle_name = puzzle_info.name
         n_pieces = puzzle_info.n_pieces
-        n_pieces = 25
+        # n_pieces = 25
         puzzle_dir = data_dir / puzzle_name
         assert n_pieces >= 1 and n_pieces <= 99
 
@@ -128,10 +129,7 @@ class JigsawDataset(Dataset):
             piece_path = puzzle_dir / "{:02}.png".format(piece_idx)
             piece_image = cv.imread(str(piece_path), cv.IMREAD_GRAYSCALE)
             assert piece_image.shape == (piece_size, piece_size)
-            return (
-                torch.from_numpy(piece_image).reshape(1, piece_size, piece_size) / 255.0
-                - 0.5
-            )
+            return normalize_piece_images(torch.from_numpy(piece_image).reshape(1, piece_size, piece_size))
 
         piece_images = list(load_image(piece_idx) for piece_idx in range(n_pieces))
         piece_tensor = torch.stack(piece_images, 0)
@@ -143,7 +141,8 @@ class JigsawDataset(Dataset):
 
             label_list = list(list(float(val) for val in row) for row in rows)
             assert len(label_list) == n_pieces
-            label_tensor = torch.FloatTensor(label_list)
+            label_tensor = normalize_piece_positions(
+                torch.FloatTensor(label_list), self.puzzle_size)
 
         # Load adjecnt.json5
         adjacent_path = puzzle_dir / "adjacent.json5"
@@ -162,6 +161,10 @@ class JigsawDataset(Dataset):
         piece_image: torch.FloatTensor,
         adjacent_map: List[List[int]],
     ):
+        # denormalize
+        piece_image = denormalize_piece_images(piece_image)
+        position = denormalize_piece_positions(position, self.puzzle_size)
+
         pi_2 = math.pi * 2
         n_pieces = piece_image.shape[0]
 
@@ -237,4 +240,7 @@ class JigsawDataset(Dataset):
         xy1 = F.pad(position[:, :2], pad=(0, 1, 0, 0), mode="constant", value=1.0)
         position[:, :2] = torch.matmul(xy1, rot_mat.transpose(0, 1))
 
+        # normalize
+        piece_image = normalize_piece_images(piece_image)
+        position = normalize_piece_positions(position, self.puzzle_size)
         return position, piece_image

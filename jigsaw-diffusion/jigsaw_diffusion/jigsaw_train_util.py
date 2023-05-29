@@ -14,7 +14,7 @@ from . import dist_util, logger
 from .fp16_util import MixedPrecisionTrainer
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
-from .jigsaw_script_util import reassemble_puzzle
+from .jigsaw_script_util import reassemble_puzzle, denormalize_piece_images, denormalize_piece_positions
 
 
 # For ImageNet experiments, this was a good default value.
@@ -168,9 +168,9 @@ class TrainLoop:
             if self.show_gui and self.step % self.log_interval == 0:
                 with th.no_grad():
                     def reassemble(positions, piece_image):
-                        pieces = ((piece_image.numpy() + 0.5) * 255.0).astype(np.uint8)
+                        pieces = ((piece_image.numpy()/2 + 0.5) * 255.0).astype(np.uint8)
                         pieces = np.transpose(pieces, [0, 2, 3, 1])
-
+                        positions = denormalize_piece_positions(positions,320)
                         return reassemble_puzzle(
                             positions=positions.numpy(),
                             pieces=pieces,

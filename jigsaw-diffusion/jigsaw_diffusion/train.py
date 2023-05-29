@@ -37,7 +37,6 @@ def main():
         deterministic=False,
     )
     logger.log("load dataset finish")
-
     logger.log("training...")
     TrainLoop(
         model=model,

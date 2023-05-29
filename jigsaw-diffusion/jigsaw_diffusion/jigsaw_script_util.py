@@ -229,11 +229,12 @@ def normalize_piece_images(images: torch.FloatTensor) -> torch.FloatTensor:
 
 
 def denormalize_piece_images(images: torch.FloatTensor) -> torch.FloatTensor:
-    return ((images + 1) / 2 * 255).type(torch.ByteTensor)
+    return ((images + 1) / 2 * 255)
 
 
 def normalize_piece_positions(positions: torch.FloatTensor, puzzle_size: int):
     # Normalize x, y to [-1, 1]
+
     positions[:2] = positions[:2] / puzzle_size * 2 - 1
 
     # Normalize rotation to [-1, 1]
