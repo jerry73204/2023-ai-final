@@ -191,56 +191,10 @@ class JigsawUNetModel(nn.Module):
         )
         self._feature_size += ch
 
-        self.output_blocks = nn.ModuleList([])
-        for level, mult in list(enumerate(channel_mult))[::-1]:
-            for i in range(num_res_blocks + 1):
-                ich = input_block_chans.pop()
-                layers = [
-                    ResBlock(
-                        ch + ich,
-                        time_embed_dim,
-                        dropout,
-                        out_channels=int(model_channels * mult),
-                        dims=dims,
-                        use_checkpoint=use_checkpoint,
-                        use_scale_shift_norm=use_scale_shift_norm,
-                    )
-                ]
-                ch = int(model_channels * mult)
-                if ds in attention_resolutions:
-                    layers.append(
-                        AttentionBlock(
-                            ch,
-                            use_checkpoint=use_checkpoint,
-                            num_heads=num_heads_upsample,
-                            num_head_channels=num_head_channels,
-                            use_new_attention_order=use_new_attention_order,
-                        )
-                    )
-                if level and i == num_res_blocks:
-                    out_ch = ch
-                    layers.append(
-                        ResBlock(
-                            ch,
-                            time_embed_dim,
-                            dropout,
-                            out_channels=out_ch,
-                            dims=dims,
-                            use_checkpoint=use_checkpoint,
-                            use_scale_shift_norm=use_scale_shift_norm,
-                            up=True,
-                        )
-                        if resblock_updown
-                        else Upsample(ch, conv_resample, dims=dims, out_channels=out_ch)
-                    )
-                    ds //= 2
-                self.output_blocks.append(TimestepEmbedSequential(*layers))
-                self._feature_size += ch
-
         self.out = nn.Sequential(
-            normalization(ch),
+            nn.Linear(ch, ch // 2),
             nn.SiLU(),
-            zero_module(conv_nd(dims, input_ch, out_channels, 3, padding=1)),
+            nn.Linear(ch // 2, out_channels),
         )
 
     def convert_to_fp16(self):
@@ -304,14 +258,9 @@ class JigsawUNetModel(nn.Module):
         # middle block
         x_h = self.middle_block(x_h, emb)
 
-        # upsampling blocks
-        for module in self.output_blocks:
-            x_h = th.cat([x_h, hs.pop()], dim=1)
-            x_h = module(x_h, emb)
-        x_h = x_h.type(x_in.dtype)
-
         # output
+        x_h = x_h.mean([2, 3])
         x_out = self.out(x_h)
-        x_out = x_out.mean([2, 3]).view(sb, sn, sp)
+        x_result = x_out.view(sb, sn, sp)
 
-        return x_out
+        return x_result
