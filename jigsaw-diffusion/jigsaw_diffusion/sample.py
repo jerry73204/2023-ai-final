@@ -14,7 +14,11 @@ import torch.distributed as dist
 import numpy as np
 
 from .jigsaw_datasets import load_data
-from .jigsaw_script_util import reassemble_puzzle
+from .jigsaw_script_util import (
+    reassemble_puzzle,
+    denormalize_piece_images,
+    denormalize_piece_positions,
+)
 import cv2 as cv  ## ADDED
 
 
@@ -99,8 +103,9 @@ def main():
         logger.log(f"created {len(all_pieces) * args.batch_size} pieces")
 
         for positions, pieces in zip(all_positions, all_pieces):
-            pieces = ((pieces + 0.5) * 255.0).astype(np.uint8)
+            pieces = denormalize_piece_images(pieces).astype(np.uint8)
             pieces = np.transpose(pieces, [0, 2, 3, 1])
+            positions = denormalize_piece_positions(positions, args.puzzle_size)
 
             image = reassemble_puzzle(
                 positions=positions,
