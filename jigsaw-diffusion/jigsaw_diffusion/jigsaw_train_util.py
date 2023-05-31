@@ -227,6 +227,7 @@ class TrainLoop:
                 self.ddp_model,
                 micro,
                 t,
+                adjacent_map,
                 model_kwargs=micro_cond,
             )
 

@@ -7,9 +7,11 @@ Docstrings have been added, as well as DDIM sampling and a new collection of bet
 
 import enum
 import math
+import itertools
 
 import numpy as np
 import torch as th
+import torch.linalg as thla
 
 from .nn import mean_flat
 from .losses import normal_kl, discretized_gaussian_log_likelihood
@@ -576,7 +578,7 @@ class GaussianDiffusion:
         noise = th.randn_like(x)
         mean_pred = (
             out["pred_xstart"] * th.sqrt(alpha_bar_prev)
-            + th.sqrt(1 - alpha_bar_prev - sigma ** 2) * eps
+            + th.sqrt(1 - alpha_bar_prev - sigma**2) * eps
         )
         nonzero_mask = (
             (t != 0).float().view(-1, *([1] * (len(x.shape) - 1)))
@@ -741,7 +743,9 @@ class GaussianDiffusion:
         output = th.where((t == 0), decoder_nll, kl)
         return {"output": output, "pred_xstart": out["pred_xstart"]}
 
-    def training_losses(self, model, x_start, t, model_kwargs=None, noise=None):
+    def training_losses(
+        self, model, x_start, t, adjacent_map, model_kwargs=None, noise=None
+    ):
         """
         Compute training losses for a single timestep.
 
@@ -798,19 +802,23 @@ class GaussianDiffusion:
                     # Without a factor of 1/1000, the VB term hurts the MSE term.
                     terms["vb"] *= self.num_timesteps / 1000.0
 
+            x_prev = self.q_posterior_mean_variance(x_start=x_start, x_t=x_t, t=t)[0]
+
             target = {
-                ModelMeanType.PREVIOUS_X: self.q_posterior_mean_variance(
-                    x_start=x_start, x_t=x_t, t=t
-                )[0],
+                ModelMeanType.PREVIOUS_X: x_prev,
                 ModelMeanType.START_X: x_start,
                 ModelMeanType.EPSILON: noise,
             }[self.model_mean_type]
             assert model_output.shape == target.shape == x_start.shape
+
+            # Compute loss terms
+            terms["matching"] = self.matching_loss(x_start, x_prev, adjacent_map)
             terms["mse"] = mean_flat((target - model_output) ** 2)
+
             if "vb" in terms:
-                terms["loss"] = terms["mse"] + terms["vb"]
+                terms["loss"] = terms["mse"] + terms["matching"] + terms["vb"]
             else:
-                terms["loss"] = terms["mse"]
+                terms["loss"] = terms["mse"] + terms["matching"]
         else:
             raise NotImplementedError(self.loss_type)
 
@@ -890,6 +898,52 @@ class GaussianDiffusion:
             "xstart_mse": xstart_mse,
             "mse": mse,
         }
+
+    def matching_loss(self, x_start_batch, x_prev_batch, adjacent_map_batch):
+        def angle_diff(lang, rang):
+            d1 = (lang - rang).abs()
+            d2 = 2.0 - d1
+            return th.minimum(d1, d2)
+
+        def pose_diff(ltarget, rtarget, lpredict, rpredict):
+            target_dist = thla.vector_norm(ltarget[:2] - rtarget[:2])
+            curr_dist = thla.vector_norm(lpredict[:2] - rpredict[:2])
+            distance_loss = (target_dist - curr_dist) ** 2
+
+            target_theta = angle_diff(ltarget[2], rtarget[2])
+            curr_theta = angle_diff(lpredict[2], rpredict[2])
+            angle_loss = (target_theta - curr_theta) ** 2
+
+            return distance_loss + angle_loss
+
+        def sample_loss_term(x_start, x_prev, adjacent_map):
+            pairs = itertools.chain.from_iterable(
+                ((lhs, rhs) for rhs in neighbors)
+                for lhs, neighbors in enumerate(adjacent_map)
+            )
+            pairs = list(filter(lambda pair: pair[0] < pair[1], pairs))
+            n_pairs = len(pairs)
+
+            avg_loss = (
+                sum(
+                    pose_diff(x_start[lhs], x_start[rhs], x_prev[lhs], x_prev[rhs])
+                    for lhs, rhs in pairs
+                )
+                / n_pairs
+            )
+
+            return avg_loss
+
+        batch_size = x_start_batch.shape[0]
+        matching_loss = (
+            sum(
+                sample_loss_term(*args)
+                for args in zip(x_start_batch, x_prev_batch, adjacent_map_batch)
+            )
+            / batch_size
+        )
+
+        return matching_loss
 
 
 def _extract_into_tensor(arr, timesteps, broadcast_shape):
