@@ -103,7 +103,7 @@ class JigsawDataset(Dataset):
             adjacent_map = self.adjacent_maps[index]
 
             if self.augment:
-                position, piece_image = self.augment_sample(
+                position, piece_image, adjacent_map = self.augment_sample(
                     position, piece_image, adjacent_map
                 )
 
@@ -172,12 +172,12 @@ class JigsawDataset(Dataset):
         piece_image: torch.FloatTensor,
         adjacent_map: List[List[int]],
     ):
+        pi_2 = math.pi * 2
+        n_pieces = piece_image.shape[0]
+
         # denormalize
         piece_image = denormalize_piece_images(piece_image)
         position = denormalize_piece_positions(position, self.puzzle_size)
-
-        pi_2 = math.pi * 2
-        n_pieces = piece_image.shape[0]
 
         # 2/3 chance to sample a subset of pieces
         # if random.random() < 2 / 3:
@@ -197,17 +197,25 @@ class JigsawDataset(Dataset):
                 filter(lambda idx: idx not in selected_set, range(n_pieces))
             )
 
-            # Erase non-selected piece images
+            # Set non-selected piece poses to random values
             xy = position[non_selected_set, :2]
             xy = (
                 torch.rand(xy.shape) * (self.puzzle_size - self.piece_size)
                 + self.piece_size / 2.0
             )
-
             rot = position[non_selected_set, 2:3]
             rot = torch.rand(rot.shape) * pi_2
 
+            # Erase non-selected piece images
             piece_image[non_selected_set] = -0.5
+
+            # Erase non-selected piece indices in the adjacent map
+            adjacent_map = list(
+                list(filter(lambda idx2: idx2 in selected_set, adjacent_map[idx]))
+                if idx in selected_set
+                else list()
+                for idx in range(n_pieces)
+            )
 
         # Random per-piece rotation
         puzzle_angle_rad = random.random() * pi_2
@@ -254,4 +262,4 @@ class JigsawDataset(Dataset):
         # normalize
         piece_image = normalize_piece_images(piece_image)
         position = normalize_piece_positions(position, self.puzzle_size)
-        return position, piece_image
+        return position, piece_image, adjacent_map
