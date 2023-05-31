@@ -74,7 +74,7 @@ def main():
     path_parent = os.path.join(logger.get_dir(), "samples")
     os.makedirs(path_parent, exist_ok=True)
     i = 0
-    for position, cond in data_loader:
+    for position, cond,_ in data_loader:
         pieces = cond["pieces"].to(dist_util.dev())
 
         model_kwargs = {"pieces": pieces}
