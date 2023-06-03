@@ -812,15 +812,18 @@ class GaussianDiffusion:
             assert model_output.shape == target.shape == x_start.shape
 
             # Compute loss terms
-            terms["matching"] = self.matching_loss(x_start, x_prev, adjacent_map)
             terms["mse"] = mean_flat((target - model_output) ** 2)
 
             if "vb" in terms:
-                terms["loss"] = terms["mse"] + terms["matching"] + terms["vb"]
+                terms["loss"] = terms["mse"] + terms["vb"]
             else:
-                terms["loss"] = terms["mse"] + terms["matching"]
+                terms["loss"] = terms["mse"]
         else:
             raise NotImplementedError(self.loss_type)
+
+        pred_sample = self.p_sample(model, x_t, t, model_kwargs=model_kwargs)["sample"]
+        terms["matching"] = self.matching_loss(x_start, pred_sample, adjacent_map)
+        terms["loss"] += terms["matching"] * (t <= 250)
 
         return terms
 
@@ -931,16 +934,13 @@ class GaussianDiffusion:
                 )
                 / n_pairs
             )
-
             return avg_loss
 
-        batch_size = x_start_batch.shape[0]
-        matching_loss = (
-            sum(
+        matching_loss = th.stack(
+            list(
                 sample_loss_term(*args)
                 for args in zip(x_start_batch, x_prev_batch, adjacent_map_batch)
             )
-            / batch_size
         )
 
         return matching_loss
